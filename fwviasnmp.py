@@ -1,5 +1,5 @@
 #
-# @(!--#) @(#) fwviasnmp.py, sversion 0.1.0, fversion 001, 28-december-2020
+# @(!--#) @(#) fwviasnmp.py, sversion 0.1.0, fversion 003, 28-december-2020
 #
 # get the firmware revision of a Raritan PDU via SNMP v2c
 #
@@ -250,14 +250,14 @@ def packetdecode(packet, verbose):
 
 ##############################################################################
 
-def querypdu(pduname, portnumber, readstring, timeout):
+def querypdu(hostname, portnumber, readstring, timeout):
     global fwversion
     
     sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
     
     packetid = random.randint(0, 0xFFFFFFFF)
 
-    print('Querying PDU {} with a packet id 0x{:08X}'.format(pduname, packetid))
+    print('Querying PDU {} with a packet id 0x{:08X}'.format(hostname, packetid))
 
     outpacket = bytearray(0)
     outpacket = dt_null() + outpacket
@@ -274,7 +274,7 @@ def querypdu(pduname, portnumber, readstring, timeout):
     
     ### showpacket(outpacket, '>')
     try:
-        sock.sendto(outpacket, (pduname, portnumber))
+        sock.sendto(outpacket, (hostname, portnumber))
     except socket.gaierror:
         fwversion = '*** Hostname lookup error ***'
         return
@@ -302,10 +302,42 @@ def querypdu(pduname, portnumber, readstring, timeout):
 
 ##############################################################################
 
-def queryallpdus(pdufile, csvfile, portnumber, readstring, timeout):
+def expandips(ip):
+    octets = ip.split('.')
+    
+    if len(octets) != 4:
+        return [ip]
+    
+    lastoctet = octets[3]
+    
+    if lastoctet.find('-') == -1:
+        return [ip]
+
+    startend = lastoctet.split('-')
+    
+    if len(startend) != 2:
+        return [ip]
+    
+    try:
+        start = int(startend[0])
+        end = int(startend[1])
+    except ValueError:
+        return [ip]
+
+    iplist = []
+        
+    while start <= end:
+        iplist.append("{}.{}.{}.{}".format(octets[0], octets[1], octets[2], start))
+        start += 1
+
+    return iplist
+
+##############################################################################
+
+def queryallpdus(hostfile, csvfile, portnumber, readstring, timeout):
     global fwversion
     
-    for line in pdufile:
+    for line in hostfile:
         line = line.strip()
         
         if line == '':
@@ -315,18 +347,16 @@ def queryallpdus(pdufile, csvfile, portnumber, readstring, timeout):
             continue
         
         words = line.split()
-        
-        pduname = words[0]
 
-        fwversion = ''
-                
-        querypdu(pduname, portnumber, readstring, timeout)
-        
-        print(fwversion)
-        
-        print('"{}","{}"'.format(pduname, fwversion), file=csvfile)
-        
-        pdufile.flush()
+        for word in words:
+             hostnames = expandips(word)
+             
+             for hostname in hostnames:        
+                fwversion = ''
+                querypdu(hostname, portnumber, readstring, timeout)
+                print(fwversion)
+                print('"{}","{}"'.format(hostname, fwversion), file=csvfile)
+                csvfile.flush()
     
     return
 
@@ -337,9 +367,9 @@ def main():
     
     parser = argparse.ArgumentParser()
         
-    parser.add_argument('--pdulist',
-                        help='file containing PDU names/IP addresses',
-                        default='pdulist.txt')
+    parser.add_argument('--hostlist',
+                        help='file containing list of PDU hostnames/IP addresses',
+                        default='hostlist.txt')
                         
     parser.add_argument('--csvfile',
                         help='file containing PDU names/IP addresses',
@@ -362,9 +392,9 @@ def main():
     args = parser.parse_args()
     
     try:
-        pdufile = open(args.pdulist, 'r')
+        hostfile = open(args.hostlist, 'r')
     except IOError:
-        print('{}: unable to open PDU list file "{}" for reading'.format(progname, args.pdulist), file=sys.stderr)
+        print('{}: unable to open PDU host list file "{}" for reading'.format(progname, args.hostlist), file=sys.stderr)
         return 1
 
     try:
@@ -373,7 +403,13 @@ def main():
         print('{}: unable to open CSV firmware file "{}" for writing'.format(progname, args.csvfile), file=sys.stderr)
         return 1
                 
-    queryallpdus(pdufile, csvfile, args.port, args.read, args.timeout)    
+    queryallpdus(hostfile, csvfile, args.port, args.read, args.timeout)    
+    
+    csvfile.flush()
+    
+    csvfile.close()
+    
+    hostfile.close()
 
     return 0
 
