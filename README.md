@@ -163,9 +163,10 @@ Note that the value can be floating point.
 ## Limitations
 
 There is not a way to specify a unique read only community string for each PDU. It is expected that the same read community string is
-deployed to logically groups sets of PDUs.
+used on all PDUs listed in a host list file.
 
-The function that breaks down the SNMP response packet is quite simplistic. Infact the only `"cool"` thing about it is the way it uses recursion.
+The function `packetdecode` that breaks down the SNMP response packet is quite simple and I suspect it is easy to break.
+However, one `"cool"` thing about `packetdecode` is the way it uses recursion.
 
 ## Contact the author
 
@@ -178,4 +179,3 @@ andy [at] cranstonhub [dot] com
 
 ------------------------
 End of README.md
-
