@@ -1,18 +1,16 @@
 #
-# pdulist.txt
+# hostlist.txt
 #
 # the input file for the fwviasnmp.py Python 3 program
 #
-# one hostname or IPv4 address per line
+# one PDU host name or IPv4 address per line
 #
-# lines begining with a hash (#) character and
-# blank lines are ignored
+# lines begining with a hash (#) character and blank lines are ignored
+#
+# IPv4 address ranges such as 10.1.1.100-150 might save you some typing :-]
 #
 
-#10.1.1.1-10
+10.1.1.21
 px3rack
-#localhost
-#10.1.1.234
-#badhostname
 
-# end of file "pdulist.txt"
+# end of file "hostlist.txt"
