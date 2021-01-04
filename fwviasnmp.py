@@ -1,5 +1,5 @@
 #
-# @(!--#) @(#) fwviasnmp.py, sversion 0.1.0, fversion 004, 04-january-2021
+# @(!--#) @(#) fwviasnmp.py, sversion 0.1.0, fversion 005, 04-january-2021
 #
 # get the firmware revision of a Raritan PDU via SNMP v2c
 #
@@ -222,34 +222,47 @@ def fwoidbytes():
 def packetdecode(packet, level):
     global fwversion
     
-    if len(packet) == 0:
-        return
+    plen = len(packet)
     
-    if len(packet) == 1:
+    i = 0
+    
+    while True:
+        if i == plen:
+            return 0
+            
+        dt = packet[i]
+        i += 1
+        
+        if i == plen:
+            return -1
+        
+        lendata = packet[i]        
+        i += 1
+    
+        if lendata > 127:
+            if DEBUG:
+                print('Length byte exceeds 127 bytes')
+            return -2
+        
         if DEBUG:
-            print('Spare byte at end of packet')
-        return
+            print('  Level: 0x{:02X}   Datatype: 0x{:02X}   Length: 0x{:02X}'.format(level, dt, lendata))
+        
+        if (i + lendata) > plen:
+            return -3
+        
+        if dt in [ 0x30, 0xA2 ]:
+            retcode = packetdecode(packet[i:i+lendata], level + 1)
+            if retcode != 0:
+                return retcode
+        else:
+            if DEBUG:
+                showpacket(packet[i:i+lendata], '=')
+            if (level == 4) and(dt == 0x04):
+                fwversion = packet[i:i+lendata].decode('utf-8')
+        i = i + lendata
     
-    code = packet[0]
-    lendata = packet[1]
-
-    if lendata > 127:
-        if DEBUG:
-            print('Length byte exceeds 127 bytes')
-        return
+    return 0
     
-    if DEBUG:
-        print('  Level: 0x{:02X}   Code: 0x{:02X}   Length: 0x{:02X}'.format(level, code, lendata))
-    
-    if code in [ 0x30, 0xA2 ]:
-        packetdecode(packet[2:], level + 1)
-    else:
-        if DEBUG:
-            showpacket(packet[2:2+lendata], '=')
-        if (level > 8) and (code == 0x04):
-            fwversion = packet[2:2+lendata].decode('utf-8')
-        packetdecode(packet[2+lendata:], level + 1)
-
 ##############################################################################
 
 def querypdu(hostname, portnumber, readstring, timeout):
@@ -298,9 +311,11 @@ def querypdu(hostname, portnumber, readstring, timeout):
     if DEBUG: 
         showpacket(inpacket, '<')
 
-    packetdecode(inpacket, 0)
+    retcode = packetdecode(inpacket, 0)
     
-    if fwversion == '':
+    if retcode != 0:
+        fwversion = 'Badly formed response packet - retcode={}'.format(retcode)    
+    elif fwversion == '':
         fwversion = 'Unable to get firmware version via SNMP'
 
     return
