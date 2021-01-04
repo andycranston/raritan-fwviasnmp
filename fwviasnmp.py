@@ -1,5 +1,5 @@
 #
-# @(!--#) @(#) fwviasnmp.py, sversion 0.1.0, fversion 003, 28-december-2020
+# @(!--#) @(#) fwviasnmp.py, sversion 0.1.0, fversion 004, 04-january-2021
 #
 # get the firmware revision of a Raritan PDU via SNMP v2c
 #
@@ -61,7 +61,9 @@ import select
 # globals
 #
 
-MAX_PACKET_SIZE          = 65536
+DEBUG = False
+
+MAX_PACKET_SIZE = 65536
 
 fwversion = ''
 
@@ -217,14 +219,14 @@ def fwoidbytes():
 
 ##############################################################################
 
-def packetdecode(packet, verbose):
+def packetdecode(packet, level):
     global fwversion
     
     if len(packet) == 0:
         return
     
     if len(packet) == 1:
-        if verbose:
+        if DEBUG:
             print('Spare byte at end of packet')
         return
     
@@ -232,21 +234,21 @@ def packetdecode(packet, verbose):
     lendata = packet[1]
 
     if lendata > 127:
-        if verbose:
+        if DEBUG:
             print('Length byte exceeds 127 bytes')
         return
     
-    if verbose:
-        print('Code: 0x{:02X}   Length: {}'.format(code, lendata))
+    if DEBUG:
+        print('  Level: 0x{:02X}   Code: 0x{:02X}   Length: 0x{:02X}'.format(level, code, lendata))
     
-    if code >= 0x30:
-        packetdecode(packet[2:], verbose)
+    if code in [ 0x30, 0xA2 ]:
+        packetdecode(packet[2:], level + 1)
     else:
-        if verbose:
+        if DEBUG:
             showpacket(packet[2:2+lendata], '=')
-        if code == 0x04:
+        if (level > 8) and (code == 0x04):
             fwversion = packet[2:2+lendata].decode('utf-8')
-        packetdecode(packet[2+lendata:], verbose)
+        packetdecode(packet[2+lendata:], level + 1)
 
 ##############################################################################
 
@@ -271,8 +273,10 @@ def querypdu(hostname, portnumber, readstring, timeout):
     outpacket = dt_string(readstring) + outpacket
     outpacket = dt_byte(1) + outpacket
     outpacket = dt_sequence(outpacket)
+
+    if DEBUG:    
+        showpacket(outpacket, '>')
     
-    ### showpacket(outpacket, '>')
     try:
         sock.sendto(outpacket, (hostname, portnumber))
     except socket.gaierror:
@@ -290,10 +294,11 @@ def querypdu(hostname, portnumber, readstring, timeout):
     except ConnectionResetError:
         fwversion = '*** Connection Reset Error ***'
         return
-        
-    ### showpacket(inpacket, '<')
+       
+    if DEBUG: 
+        showpacket(inpacket, '<')
 
-    packetdecode(inpacket, False)
+    packetdecode(inpacket, 0)
     
     if fwversion == '':
         fwversion = 'Unable to get firmware version via SNMP'
