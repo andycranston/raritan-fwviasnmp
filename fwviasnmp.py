@@ -1,5 +1,5 @@
 #
-# @(!--#) @(#) fwviasnmp.py, sversion 0.1.0, fversion 005, 04-january-2021
+# @(!--#) @(#) fwviasnmp.py, sversion 0.1.0, fversion 006, 05-january-2021
 #
 # get the firmware revision of a Raritan PDU via SNMP v2c
 #
@@ -220,6 +220,7 @@ def fwoidbytes():
 ##############################################################################
 
 def packetdecode(packet, level):
+    global DEBUG
     global fwversion
     
     plen = len(packet)
@@ -266,6 +267,7 @@ def packetdecode(packet, level):
 ##############################################################################
 
 def querypdu(hostname, portnumber, readstring, timeout):
+    global DEBUG
     global fwversion
     
     sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
@@ -384,6 +386,7 @@ def queryallpdus(hostfile, csvfile, portnumber, readstring, timeout):
 
 def main():
     global progname
+    global DEBUG
     
     parser = argparse.ArgumentParser()
         
@@ -409,7 +412,16 @@ def main():
                         type=float,
                         default=3.0)
 
+    parser.add_argument('--debug',
+                        help='output additional information for debugging',
+                        action='store_true')
+
     args = parser.parse_args()
+    
+    if args.debug:
+        DEBUG = True
+        
+    print(DEBUG)
     
     try:
         hostfile = open(args.hostlist, 'r')
