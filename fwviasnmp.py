@@ -421,8 +421,6 @@ def main():
     if args.debug:
         DEBUG = True
         
-    print(DEBUG)
-    
     try:
         hostfile = open(args.hostlist, 'r')
     except IOError:
