@@ -99,6 +99,7 @@ optional arguments:
   --read READ          read community string
   --port PORT          port number
   --timeout TIMEOUT    port number
+  --debug              output additional information for debugging
 ```
 
 ## Command line option `--hostfile`
@@ -160,6 +161,49 @@ python fwviasnmp.py --timeout 5.5
 
 Note that the value can be floating point.
 
+## Command line option `--debug`
+
+If you want to see lots of low level information while the `fwviasnmp.py` program runs
+then add the `--debug` command line option. This can be useful for debugging the code and/or
+seeing the low level bytes that are sent to/from the PDUs. For example:
+
+```
+python fwviasnmp.py --debug
+```
+
+might display something similar to:
+
+```
+Querying PDU 10.1.1.2 with a packet id 0xC3C42111
+> 0000 : 30 31 02 01 01 04 06 70 75 62 6C 69 63 A0 24 02    01?????public?$?
+> 0016 : 04 C3 C4 21 11 02 01 00 02 01 00 30 16 30 14 06    ???!???????0?0??
+> 0032 : 10 2B 06 01 04 01 EB 2E 06 03 02 03 01 06 01 01    ?+?????.????????
+> 0048 : 01 05 00                                           ???
+< 0000 : 30 31 02 01 01 04 06 70 75 62 6C 69 63 A2 24 02    01?????public?$?
+< 0016 : 04 C3 C4 21 11 02 01 00 02 01 00 30 16 30 14 06    ???!???????0?0??
+< 0032 : 10 2B 06 01 04 01 EB 2E 06 03 02 03 01 06 01 01    ?+?????.????????
+< 0048 : 01 80 00                                           ???
+  Level: 0x00   Datatype: 0x30   Length: 0x31
+  Level: 0x01   Datatype: 0x02   Length: 0x01
+= 0000 : 01                                                 ?
+  Level: 0x01   Datatype: 0x04   Length: 0x06
+= 0000 : 70 75 62 6C 69 63                                  public
+  Level: 0x01   Datatype: 0xA2   Length: 0x24
+  Level: 0x02   Datatype: 0x02   Length: 0x04
+= 0000 : C3 C4 21 11                                        ??!?
+  Level: 0x02   Datatype: 0x02   Length: 0x01
+= 0000 : 00                                                 ?
+  Level: 0x02   Datatype: 0x02   Length: 0x01
+= 0000 : 00                                                 ?
+  Level: 0x02   Datatype: 0x30   Length: 0x16
+  Level: 0x03   Datatype: 0x30   Length: 0x14
+  Level: 0x04   Datatype: 0x06   Length: 0x10
+= 0000 : 2B 06 01 04 01 EB 2E 06 03 02 03 01 06 01 01 01    +?????.?????????
+  Level: 0x04   Datatype: 0x80   Length: 0x00
+= <empty packet>
+Unable to get firmware version via SNMP
+```
+
 ## Limitations
 
 There is not a way to specify a unique read only community string for each PDU. It is expected that the same read community string is
@@ -178,4 +222,4 @@ andy [at] cranstonhub [dot] com
 ```
 
 ------------------------
-End of README.md
+End of README.md (sversion 0.1.0, fversion 005, 05-january-2021)
