@@ -90,13 +90,15 @@ You should get output similar to:
 
 ```
 usage: fwviasnmp.py [-h] [--hostlist HOSTLIST] [--csvfile CSVFILE]
-                    [--read READ] [--port PORT] [--timeout TIMEOUT]
+                    [--read READ] [--oid OID] [--port PORT]
+                    [--timeout TIMEOUT] [--debug]
 
 optional arguments:
   -h, --help           show this help message and exit
   --hostlist HOSTLIST  file containing list of PDU hostnames/IP addresses
   --csvfile CSVFILE    file containing PDU names/IP addresses
   --read READ          read community string
+  --oid OID            default OID for PDU firmware
   --port PORT          port number
   --timeout TIMEOUT    port number
   --debug              output additional information for debugging
@@ -135,6 +137,35 @@ python fwviasnmp.py --read mysecret
 ```
 
 would use `mysecret` as the read community string.
+
+## Command line option `--oid`
+
+By default the `fwviasnmp.py` program sends this OID (Object IDentfier):
+
+```
+.1.3.6.1.4.1.13742.6.3.2.3.1.6.1.1.1
+```
+
+via a SNMP GET Request packet. This works on PX2 and PX3 Raritan PDUs. On older PDUs such as the PX range
+(for example a PX-5805T) a different OID needs to be sent. For example you could trying sending this OID:
+
+```
+.1.3.6.1.4.1.13742.4.1.1.1.0
+```
+
+by running this command line:
+
+```
+python fwviasnmp.py --oid .1.3.6.1.4.1.13742.4.1.1.1.0
+```
+
+Note that the first '.' character can be left out so this command line:
+
+```
+python fwviasnmp.py --oid 1.3.6.1.4.1.13742.4.1.1.1.0
+```
+
+is the same.
 
 ## Command line option `--port`
 
