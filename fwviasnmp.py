@@ -1,5 +1,5 @@
 #
-# @(!--#) @(#) fwviasnmp.py, sversion 0.1.0, fversion 006, 05-january-2021
+# @(!--#) @(#) fwviasnmp.py, sversion 0.1.0, fversion 008, 06-january-2021
 #
 # get the firmware revision of a Raritan PDU via SNMP v2c
 #
@@ -12,9 +12,17 @@
 #
 
 #
-# OID for firmware
+# OID for firmware (works with PX2 and PX3)
 #
 #   .1.3.6.1.4.1.13742.6.3.2.3.1.6.1.1.1
+#
+#   enterprises.raritan.pdu2.configuration.unit.controllerConfigurationTable.controllerConfigurationEntry.boardFirmwareVersion
+#
+# Alternative OID:
+#
+#   .1.3.6.1.4.1.13742.4.1.1.1.0
+#
+#   enterprises.raritan.pdu.board.info.firmwareVersion
 #
 
 #
@@ -64,6 +72,13 @@ import select
 DEBUG = False
 
 MAX_PACKET_SIZE = 65536
+
+DEFAULT_FIRMWARE_OID = '.1.3.6.1.4.1.13742.6.3.2.3.1.6.1.1.1'
+
+PXOID      = '.1.3.6.1.4.1.13742.4.1.1.1.0'
+PX2AND3OID = '.1.3.6.1.4.1.13742.6.3.2.3.1.6.1.1.1'
+
+DEFAULT_FIRMWARE_OID = PX2AND3OID
 
 fwversion = ''
 
@@ -219,6 +234,52 @@ def fwoidbytes():
 
 ##############################################################################
 
+def num2bytes(n):
+    if n < 128:
+        ba = bytearray(1)
+        ba[0] = ((n & 0x0000007F) >> 0) + 0x00
+    elif n < (128 * 128):
+        ba = bytearray(2)
+        ba[0] = ((n & 0x00003F80) >> 7) + 0x80
+        ba[1] = ((n & 0x0000007F) >> 0) + 0x00
+    elif n < (128 * 128 * 128):
+        ba = bytearray(3)
+        ba[0] = ((n & 0x001fC000) >> 14) + 0x80
+        ba[1] = ((n & 0x00003F80) >> 7)  + 0x80
+        ba[2] = ((n & 0x0000007F) >> 0)  + 0x00
+    else:
+        ba = bytearray(3)
+        ba[0] = 0xFF
+        ba[1] = 0xFF
+        ba[2] = 0xFF
+        ba[3] = 0xFF
+        
+    return ba
+
+##############################################################################
+
+def string2oid(s):
+    # if first char is a . then lose it
+    if len(s) >= 2:
+        if s[0] == '.':
+            s = s[1:]
+            
+    numbers = s.split('.')
+    
+    if len(numbers) < 3:
+        return bytearray(0)
+    
+    oid = bytearray(1)
+    
+    oid[0] = (int(numbers[0]) * 40) + int(numbers[1])
+    
+    for number in numbers[2:]:
+        oid = oid + num2bytes(int(number))
+    
+    return oid
+
+##############################################################################
+
 def packetdecode(packet, level):
     global DEBUG
     global fwversion
@@ -266,7 +327,7 @@ def packetdecode(packet, level):
     
 ##############################################################################
 
-def querypdu(hostname, portnumber, readstring, timeout):
+def querypdu(hostname, portnumber, readstring, oidbytes, timeout):
     global DEBUG
     global fwversion
     
@@ -278,7 +339,7 @@ def querypdu(hostname, portnumber, readstring, timeout):
 
     outpacket = bytearray(0)
     outpacket = dt_null() + outpacket
-    outpacket = dt_object_identifier(fwoidbytes()) + outpacket
+    outpacket = dt_object_identifier(oidbytes) + outpacket
     outpacket = dt_sequence(outpacket)
     outpacket = dt_sequence(outpacket)
     outpacket = dt_byte(0) + outpacket
@@ -356,7 +417,7 @@ def expandips(ip):
 
 ##############################################################################
 
-def queryallpdus(hostfile, csvfile, portnumber, readstring, timeout):
+def queryallpdus(hostfile, csvfile, portnumber, oidbytes, readstring, timeout):
     global fwversion
     
     for line in hostfile:
@@ -375,7 +436,7 @@ def queryallpdus(hostfile, csvfile, portnumber, readstring, timeout):
              
              for hostname in hostnames:        
                 fwversion = ''
-                querypdu(hostname, portnumber, readstring, timeout)
+                querypdu(hostname, portnumber, oidbytes, readstring, timeout)
                 print(fwversion)
                 print('"{}","{}"'.format(hostname, fwversion), file=csvfile)
                 csvfile.flush()
@@ -402,6 +463,10 @@ def main():
                         help='read community string',
                         default='public')
                         
+    parser.add_argument('--oid',
+                        help='default OID for PDU firmware',
+                        default=DEFAULT_FIRMWARE_OID)
+                        
     parser.add_argument('--port',
                         help='port number',
                         type=int,
@@ -421,6 +486,12 @@ def main():
     if args.debug:
         DEBUG = True
         
+    oidbytes = string2oid(args.oid)
+    
+    if len(oidbytes) == 0:
+        print('{}: badly formatted OID "{}"'.format(progname, args.oid), file=sys.stderr)
+        return 1
+        
     try:
         hostfile = open(args.hostlist, 'r')
     except IOError:
@@ -433,7 +504,7 @@ def main():
         print('{}: unable to open CSV firmware file "{}" for writing'.format(progname, args.csvfile), file=sys.stderr)
         return 1
                 
-    queryallpdus(hostfile, csvfile, args.port, args.read, args.timeout)    
+    queryallpdus(hostfile, csvfile, args.port, args.read, oidbytes, args.timeout)    
     
     csvfile.flush()
     
